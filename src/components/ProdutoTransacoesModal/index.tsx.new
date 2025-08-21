@@ -1,0 +1,543 @@
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  IconButton,
+  Typography,
+  Box,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  CircularProgress,
+  Divider
+} from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { useApi } from '../../hooks/useApi';
+
+interface ProdutoTransacoesModalProps {
+  open: boolean;
+  onClose: () => void;
+  produtoId?: string;
+  showAllProducts?: boolean;
+}
+
+interface ProdutoVendas {
+  produto_id: string;
+  produto_nome: string;
+  quantidade: number;
+  valorTotal: number;
+  transacoes: {
+    id: string;
+    data: string;
+    bot_nome: string;
+    status: string;
+    valor: number;
+  }[];
+}
+
+// Interface para tipagem da transação
+interface ApiTransactionDetailed {
+  bot: string | { id?: string, _id?: string, name?: string },
+  _id: string,
+  product: string | { id?: string, _id?: string, name?: string, price?: number | string },
+  status: string,
+  created_at: number
+}
+
+// Interface para tipagem do produto
+interface ProductDetailedInfo {
+  id?: string;
+  _id?: string;
+  name: string;
+  price: number | string;
+}
+
+// Cache dos dados por produtoId
+const CACHE_TIMEOUT = 5 * 60 * 1000; // 5 minutos em ms
+
+const ProdutoTransacoesModal: React.FC<ProdutoTransacoesModalProps> = ({ 
+  open, 
+  onClose, 
+  produtoId,
+  showAllProducts = false
+}) => {
+  const [loading, setLoading] = useState(true);
+  const [produtoNome, setProdutoNome] = useState('');
+  const [produtosVendas, setProdutosVendas] = useState<ProdutoVendas[]>([]);
+  const [totalVendas, setTotalVendas] = useState(0);
+  const [faturamentoTotal, setFaturamentoTotal] = useState(0);
+  // Ref para armazenar cache dos dados por produtoId
+  const dadosCache = useRef<Record<string, { 
+    produtoNome: string, 
+    produtosVendas: ProdutoVendas[],
+    totalVendas: number,
+    faturamentoTotal: number,
+    timestamp: number 
+  }>>({});
+  
+  // Controlador para evitar múltiplas requisições simultâneas
+  const loadingRef = useRef<boolean>(false);
+  
+  // Ref para armazenar todos os produtos para poder restaurá-los
+  const todosProdutosRef = useRef<ProdutoVendas[]>([]);
+  
+  const api = useApi();
+  
+  // Função para lidar com o clique em um produto na tabela de visão geral
+  const handleProdutoClick = (produtoId: string, event?: React.MouseEvent) => {
+    // Evitar propagação do evento para evitar que o clique chegue a outros elementos
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+    
+    // Evita processamento se já estiver carregando
+    if (loading) {
+      console.log("Ignorando clique no produto porque está carregando");
+      return;
+    }
+    
+    console.log("Clicou no produto:", produtoId);
+    
+    try {
+      // Salvar todos os produtos atuais antes de filtrar
+      todosProdutosRef.current = [...produtosVendas];
+      console.log("Salvou lista de produtos:", todosProdutosRef.current.length);
+      
+      // Criar uma versão filtrada dos dados atuais para exibir apenas o produto clicado
+      const produtoSelecionado = produtosVendas.find(p => p.produto_id === produtoId);
+      if (produtoSelecionado) {
+        console.log("Produto selecionado:", produtoSelecionado.produto_nome);
+        setProdutoNome(produtoSelecionado.produto_nome);
+        setProdutosVendas([produtoSelecionado]);
+      } else {
+        console.log("Produto não encontrado");
+      }
+    } catch (error) {
+      console.error("Erro ao processar clique no produto:", error);
+    }
+  };
+
+  // Função para voltar à visão geral de todos os produtos
+  const handleVoltarParaVisaoGeral = (event?: React.MouseEvent) => {
+    // Evitar propagação do evento para evitar que o clique chegue a outros elementos
+    if (event) {
+      event.stopPropagation();
+      event.preventDefault();
+    }
+    
+    // Evita processamento se já estiver carregando
+    if (loading) {
+      console.log("Ignorando clique em voltar porque está carregando");
+      return;
+    }
+    
+    console.log("Voltando para visão geral");
+    
+    // Restaurar todos os produtos
+    if (todosProdutosRef.current.length > 0) {
+      setProdutosVendas(todosProdutosRef.current);
+      console.log("Restaurou lista de produtos:", todosProdutosRef.current.length);
+    } else {
+      console.log("Não há produtos salvos para restaurar");
+    }
+  };
+
+  const carregarDados = useCallback(async () => {
+    // Se não está configurado para mostrar todos os produtos e o produtoId for vazio, não faz nada
+    if (!showAllProducts && !produtoId) return;
+    
+    // Verifica se já existe uma requisição em andamento
+    if (loadingRef.current) return;
+    
+    // Verifica se já temos dados em cache para este produtoId
+    const cacheKey = produtoId || 'todos';
+    const cacheData = dadosCache.current[cacheKey];
+    const agora = Date.now();
+    
+    if (cacheData && (agora - cacheData.timestamp) < CACHE_TIMEOUT) {
+      console.log('Usando dados em cache para o produto:', cacheKey);
+      
+      // Usa dados do cache
+      setProdutoNome(cacheData.produtoNome);
+      setProdutosVendas(cacheData.produtosVendas);
+      setTotalVendas(cacheData.totalVendas);
+      setFaturamentoTotal(cacheData.faturamentoTotal);
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      // Marca como carregando para evitar requisições duplicadas
+      loadingRef.current = true;
+      setLoading(true);
+      
+      console.log('Carregando dados novos para o produto:', cacheKey);
+      
+      // Buscar estatísticas detalhadas
+      const now = Date.now();
+      const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
+      
+      const detailedStatsResponse = await api.getBotStatsDetailed({
+        dateRange: {
+          start: thirtyDaysAgo,
+          end: now
+        }
+      });
+
+      // Buscar produtos para obter informações completas
+      const productsResponse = await api.listProducts();
+      const productsMap = new Map<string, ProductDetailedInfo>();
+      
+      if (productsResponse.data && Array.isArray(productsResponse.data)) {
+        productsResponse.data.forEach((product: ProductDetailedInfo) => {
+          productsMap.set(product.id || product._id || '', product);
+        });
+      }
+      
+      // Buscar informações dos bots
+      const botsResponse = await api.listBots();
+      const botsMap = new Map<string, { id?: string, _id?: string, name: string }>();
+      
+      if (botsResponse.data && Array.isArray(botsResponse.data)) {
+        botsResponse.data.forEach((bot: { id?: string, _id?: string, name: string }) => {
+          botsMap.set(bot.id || bot._id || '', bot);
+        });
+      }
+
+      // Filtrar transações para este produto e agrupar por produto
+      if (detailedStatsResponse.data && Array.isArray(detailedStatsResponse.data)) {
+        let transactions = detailedStatsResponse.data;
+        
+        // Se fornecido um produtoId específico, filtrar apenas por ele
+        if (produtoId) {
+          transactions = transactions.filter((transaction: ApiTransactionDetailed) => {
+            const transactionProductId = typeof transaction.product === 'string' 
+              ? transaction.product 
+              : (transaction.product ? String(transaction.product.id || transaction.product._id) : '');
+            
+            return transactionProductId === produtoId;
+          });
+          
+          // Definir o nome do produto
+          const productInfo = productsMap.get(produtoId);
+          if (productInfo) {
+            setProdutoNome(productInfo.name);
+          } else {
+            setProdutoNome(`Produto #${produtoId}`);
+          }
+        } else {
+          // Se mostrarmos todos os produtos
+          setProdutoNome('Todos os Produtos');
+        }
+
+        const produtosMap = new Map<string, ProdutoVendas>();
+        let totalTransacoes = 0;
+        let totalFaturamento = 0;
+
+        transactions.forEach((transacao: ApiTransactionDetailed) => {
+          const productId = typeof transacao.product === 'string' 
+            ? transacao.product 
+            : (transacao.product ? String(transacao.product.id || transacao.product._id) : '');
+          
+          const botId = typeof transacao.bot === 'string'
+            ? transacao.bot
+            : (transacao.bot ? String(transacao.bot.id || transacao.bot._id) : '');
+          
+          const productInfo = productsMap.get(productId);
+          const produtoNome = productInfo ? productInfo.name : `Produto #${productId}`;
+          const precoUnitario = productInfo ? (typeof productInfo.price === 'number' ? productInfo.price : parseFloat(String(productInfo.price)) || 0) : 0;
+          const isApproved = transacao.status === 'approved';
+          
+          // Buscar informações do bot
+          const botInfo = botsMap.get(botId);
+          const botNome = botInfo ? botInfo.name : `Bot #${botId}`;
+          
+          totalTransacoes++;
+          if (isApproved) {
+            totalFaturamento += precoUnitario;
+          }
+
+          if (!produtosMap.has(productId)) {
+            produtosMap.set(productId, {
+              produto_id: productId,
+              produto_nome: produtoNome,
+              quantidade: 0,
+              valorTotal: 0,
+              transacoes: []
+            });
+          }
+
+          const produto = produtosMap.get(productId)!;
+          
+          if (isApproved) {
+            produto.quantidade++;
+            produto.valorTotal += precoUnitario;
+          }
+          
+          produto.transacoes.push({
+            id: transacao._id,
+            data: new Date(transacao.created_at).toLocaleString('pt-BR'),
+            bot_nome: botNome,
+            status: transacao.status,
+            valor: precoUnitario
+          });
+        });
+
+        // Converter map para array e ordenar por valor total (maior para menor)
+        const produtosArray = Array.from(produtosMap.values())
+          .sort((a, b) => b.valorTotal - a.valorTotal);
+        
+        setProdutosVendas(produtosArray);
+        setTotalVendas(totalTransacoes);
+        setFaturamentoTotal(totalFaturamento);
+        
+        // Salva os dados no cache
+        dadosCache.current[cacheKey] = {
+          produtoNome: produtoNome || (produtoId ? `Produto #${produtoId}` : 'Todos os Produtos'),
+          produtosVendas: produtosArray,
+          totalVendas: totalTransacoes,
+          faturamentoTotal: totalFaturamento,
+          timestamp: Date.now()
+        };
+      }
+    } catch (error) {
+      console.error("Erro ao carregar histórico de produtos:", error);
+    } finally {
+      setLoading(false);
+      loadingRef.current = false;
+    }
+  }, [produtoId, api, showAllProducts, produtoNome]);
+  
+  // Efeito para carregar dados quando o modal é aberto
+  useEffect(() => {
+    if (open) {
+      carregarDados();
+    }
+  }, [open, carregarDados]);
+
+  return (
+    <Dialog 
+      open={open} 
+      onClose={onClose}
+      fullWidth
+      maxWidth="md"
+      PaperProps={{
+        sx: {
+          bgcolor: '#181f2a',
+          color: '#e0e0e0',
+          borderRadius: 2
+        }
+      }}
+    >
+      <DialogTitle sx={{ bgcolor: '#1a2332', p: 2 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Typography variant="h6" fontWeight={600}>
+            {showAllProducts ? 'Histórico de Vendas - Produtos' : `Histórico de Vendas - ${produtoNome}`}
+          </Typography>
+          <IconButton onClick={onClose} sx={{ color: '#8fa3c8' }}>
+            <CloseIcon />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+      <DialogContent sx={{ p: 3 }}>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+            <CircularProgress size={40} sx={{ color: '#60a5fa' }} />
+          </Box>
+        ) : (
+          <Box>
+            <Box sx={{ mb: 3, p: 2, bgcolor: '#222b3c', borderRadius: 1 }}>
+              <Typography variant="subtitle1" gutterBottom fontWeight={500}>
+                Resumo de Vendas
+              </Typography>
+              <Box display="flex" gap={4}>
+                <Box>
+                  <Typography variant="body2" color="#8fa3c8" fontSize="0.85rem">
+                    Total de Transações
+                  </Typography>
+                  <Typography variant="h6" fontWeight={600}>
+                    {totalVendas}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="body2" color="#8fa3c8" fontSize="0.85rem">
+                    Faturamento Total
+                  </Typography>
+                  <Typography variant="h6" fontWeight={600}>
+                    R$ {faturamentoTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+            
+            {/* A parte de navegação entre abas foi removida para simplificar a interface */}
+            
+            {showAllProducts ? (
+              <TableContainer component={Paper} sx={{ bgcolor: '#1a2332', mb: 3 }}>
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: '#253046' }}>
+                      <TableRow>
+                        <TableCell sx={{ color: '#8fa3c8', fontWeight: 500, fontSize: '0.8rem' }}>Produto</TableCell>
+                        <TableCell sx={{ color: '#8fa3c8', fontWeight: 500, fontSize: '0.8rem' }}>Quantidade Vendida</TableCell>
+                        <TableCell sx={{ color: '#8fa3c8', fontWeight: 500, fontSize: '0.8rem' }} align="right">Valor Total</TableCell>
+                      </TableRow>
+                    </TableHead>
+                  <TableBody>
+                    {produtosVendas.map((produto) => (
+                      <TableRow 
+                        key={produto.produto_id} 
+                        sx={{ 
+                          '&:hover': { bgcolor: '#253046' },
+                          cursor: 'pointer'
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          handleProdutoClick(produto.produto_id, e);
+                        }}
+                      >
+                        <TableCell sx={{ color: '#e0e0e0', fontSize: '0.8rem' }}>
+                          {produto.produto_nome}
+                        </TableCell>
+                        <TableCell sx={{ color: '#e0e0e0', fontSize: '0.8rem' }}>{produto.quantidade}</TableCell>
+                        <TableCell sx={{ color: '#e0e0e0', fontSize: '0.8rem', fontWeight: 600 }} align="right">
+                          R$ {produto.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : (
+              produtosVendas.map((produto, index) => (
+                <Box key={produto.produto_id || index} sx={{ mb: 3 }}>
+                  <Box sx={{ p: 2, bgcolor: '#222b3c', borderRadius: 1, mb: 1 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="subtitle1" fontWeight={500}>
+                        {produto.produto_nome}
+                      </Typography>
+                      {showAllProducts && (
+                        <IconButton 
+                          size="small" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            handleVoltarParaVisaoGeral(e);
+                          }}
+                          sx={{ color: '#8fa3c8' }}
+                          title="Voltar para visão geral"
+                        >
+                          <ArrowBackIcon fontSize="small" />
+                        </IconButton>
+                      )}
+                    </Box>
+                    <Box display="flex" gap={4} mt={1}>
+                      <Typography variant="body2">
+                        <span style={{ color: '#8fa3c8' }}>Quantidade:</span> {produto.quantidade}
+                      </Typography>
+                      <Typography variant="body2">
+                        <span style={{ color: '#8fa3c8' }}>Valor Total:</span> R$ {produto.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  
+                  <TableContainer component={Paper} sx={{ bgcolor: '#1a2332', mb: 3 }}>
+                    <Table size="small">
+                      <TableHead sx={{ bgcolor: '#253046' }}>
+                        <TableRow>
+                          <TableCell sx={{ color: '#8fa3c8', fontWeight: 500, fontSize: '0.8rem' }}>ID da Transação</TableCell>
+                          <TableCell sx={{ color: '#8fa3c8', fontWeight: 500, fontSize: '0.8rem' }}>Data</TableCell>
+                          <TableCell sx={{ color: '#8fa3c8', fontWeight: 500, fontSize: '0.8rem' }}>Bot</TableCell>
+                          <TableCell sx={{ color: '#8fa3c8', fontWeight: 500, fontSize: '0.8rem' }}>Status</TableCell>
+                          <TableCell sx={{ color: '#8fa3c8', fontWeight: 500, fontSize: '0.8rem' }} align="right">
+                            Valor 
+                            {showAllProducts && produtosVendas.length === 1 && (
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  handleVoltarParaVisaoGeral(e);
+                                }}
+                                sx={{ color: '#8fa3c8', ml: 1 }}
+                                title="Voltar para todos produtos"
+                              >
+                                <ArrowBackIcon fontSize="small" />
+                              </IconButton>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {produto.transacoes.map((transacao) => (
+                          <TableRow key={transacao.id} sx={{ 
+                            '&:hover': { bgcolor: '#253046' },
+                            bgcolor: transacao.status === 'approved' ? 'rgba(20, 202, 116, 0.1)' :
+                                     transacao.status === 'pending' ? 'rgba(249, 181, 86, 0.1)' : 
+                                     'rgba(255, 90, 101, 0.1)'
+                          }}>
+                            <TableCell sx={{ color: '#e0e0e0', fontSize: '0.8rem', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {transacao.id}
+                            </TableCell>
+                            <TableCell sx={{ color: '#e0e0e0', fontSize: '0.8rem' }}>{transacao.data}</TableCell>
+                            <TableCell sx={{ color: '#e0e0e0', fontSize: '0.8rem' }}>{transacao.bot_nome}</TableCell>
+                            <TableCell sx={{ fontSize: '0.8rem' }}>
+                              <Box component="span" sx={{ 
+                                py: 0.5, 
+                                px: 1, 
+                                borderRadius: 1, 
+                                bgcolor: transacao.status === 'approved' ? 'rgba(20, 202, 116, 0.2)' :
+                                        transacao.status === 'pending' ? 'rgba(249, 181, 86, 0.2)' : 
+                                        'rgba(255, 90, 101, 0.2)',
+                                color: transacao.status === 'approved' ? '#14CA74' :
+                                       transacao.status === 'pending' ? '#F9B556' : 
+                                       '#FF5A65'
+                              }}>
+                                {transacao.status === 'approved' ? 'Aprovado' :
+                                 transacao.status === 'pending' ? 'Pendente' : 
+                                 'Cancelado'}
+                              </Box>
+                            </TableCell>
+                            <TableCell sx={{ 
+                              color: '#e0e0e0', 
+                              fontSize: '0.8rem',
+                              fontWeight: transacao.status === 'approved' ? 600 : 400,
+                              opacity: transacao.status === 'approved' ? 1 : 0.7
+                            }} align="right">
+                              R$ {transacao.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                  
+                  {index < (produtosVendas.length - 1) && (
+                    <Divider sx={{ bgcolor: '#2a3756', my: 2 }} />
+                  )}
+                </Box>
+              ))
+            )}
+            
+            {produtosVendas.length === 0 && (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Typography variant="body1" color="#8fa3c8">
+                  Nenhuma transação encontrada para {produtoId ? 'este produto' : 'os produtos'}.
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default ProdutoTransacoesModal;
