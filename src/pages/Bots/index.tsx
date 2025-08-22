@@ -13,7 +13,12 @@ import { ProductsManager } from './ProductsManager';
 import type { BotData } from './VisualizarBotModal';
 import type { BotResponseData } from '../../types/api';
 import { useApi } from '../../hooks/useApi';
-import RestartSvg from '../../assets/Restart.svg';
+import RestartSvg from '../../assets/Restart.svg';  
+import GroupsIcon from "@mui/icons-material/Groups";
+import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
+import PaidIcon from "@mui/icons-material/Paid";
+import ReportProblemIcon from "@mui/icons-material/ReportProblem";
+
 
 // Componentes com carregamento sob demanda para evitar requisições duplicadas
 const LazyCallbacksManager = () => {
@@ -139,7 +144,7 @@ export function Bots() {
   const [botToDelete, setBotToDelete] = useState<{ id: string, nome: string } | null>(null);
   const [isInitialLoading, setIsInitialLoading] = useState(true); // Loading apenas para carregamento inicial
   const [isRefreshing, setIsRefreshing] = useState(false); // Loading para refresh manual
-
+  
   const {
     listBots,
     restartBot,
@@ -371,7 +376,52 @@ export function Bots() {
       {/* Cabeçalho da página com título */}
       <Typography variant="h5" gutterBottom fontWeight={600} color="#fff" marginTop={6}>
         Gerenciamento de Bots
-      </Typography>      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+      </Typography>     
+      {/* Estatísticas de usuários */}
+<Grid container spacing={2} sx={{ mb: 3 }}>
+  {[
+    { label: "Usuários Totais", value: 1234, icon: GroupsIcon },
+    { label: "Usuários /start", value: 850, icon: PlayCircleOutlineIcon },
+    { label: "Usuários Pagantes", value: 320, icon: PaidIcon },
+    { label: "Gerou e não Pagou", value: 530, icon: ReportProblemIcon },
+  ].map((stat, index) => (
+    <Grid item xs={12} sm={6} md={3} key={index}>
+      <Paper
+        sx={{
+          p: 2,
+          borderRadius: "12px",
+          bgcolor: "#0a0b0cff",
+          color: "#fff",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 1,
+          alignItems: "flex-start",
+          transition: "transform 0.2s, box-shadow 0.2s",
+          "&:hover": {
+            transform: "translateY(-2px)",
+            boxShadow: "0 6px 16px rgba(0,0,0,0.3)",
+          },
+        }}
+      >
+        <Box display="flex" alignItems="center" gap={1} mb={1}>
+          <stat.icon sx={{ fontSize: 30, color: "#1361c7ff" }} />
+          <Typography
+            variant="body2"
+            sx={{ color: "#CBD5E1", fontWeight: 500 }}
+          >
+            {stat.label}
+          </Typography>
+        </Box>
+        <Typography variant="h5" fontWeight={700}>
+          {stat.value}
+        </Typography>
+      </Paper>
+    </Grid>
+  ))}
+</Grid>
+      
+       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Button
             variant="contained"
