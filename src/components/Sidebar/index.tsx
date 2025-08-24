@@ -28,9 +28,9 @@ import SmartToyIcon from '@mui/icons-material/SmartToy';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
+import CampaignIcon from '@mui/icons-material/Campaign'; 
 
 import Logo from '../../assets/Union.svg';
-import { Padding } from '@mui/icons-material';
 
 const drawerWidth = 260;
 
@@ -40,10 +40,10 @@ const LogoBox = styled(Box)({
   gap: 8,
   cursor: 'pointer',
   userSelect: 'none',
-  transition: 'transform 0.3s ease, filter 0.3s ease', 
+  transition: 'transform 0.3s ease, filter 0.3s ease',
   '&:hover': {
     transform: 'scale(1.05)',
-    filter: 'drop-shadow(0 0 6px rgba(255, 255, 255, 0.4))', 
+    filter: 'drop-shadow(0 0 6px rgba(255, 255, 255, 0.4))',
   },
 });
 
@@ -74,7 +74,7 @@ const StyledListItem = styled(ListItem)<{ selected?: boolean }>(({ selected }) =
   borderRadius: 10,
   padding: '6px 12px',
   background: selected ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-  transition: 'background-color 0.3s ease', 
+  transition: 'background-color 0.3s ease',
   '&:hover': {
     background: 'rgba(255, 255, 255, 0.12)',
   },
@@ -83,7 +83,7 @@ const StyledListItem = styled(ListItem)<{ selected?: boolean }>(({ selected }) =
   justifyContent: 'center',
 }));
 
-const NotificationBox = styled(Box)({ 
+const NotificationBox = styled(Box)({
   padding: '6px 14px',
   background: 'rgba(255, 255, 255, 0.06)',
   borderRadius: 10,
@@ -109,14 +109,14 @@ const ThemeSwitchBox = styled(Box)({
 
 interface MenuItem {
   text: string;
-  icon: ReactElement; 
+  icon: ReactElement;
   path: string;
 }
 
 interface SidebarProps {
   collapsed: boolean;
   isMobile?: boolean;
-  mobileOpen?: boolean; 
+  mobileOpen?: boolean;
   onDrawerClose?: () => void;
 }
 
@@ -162,6 +162,7 @@ export function Sidebar({ collapsed, isMobile = false, mobileOpen = false, onDra
     { text: 'Dashboard', icon: <DashboardIcon fontSize="small" />, path: '/' },
     { text: 'Gastos', icon: <MonetizationOnIcon fontSize="small" />, path: '/gastos' },
     { text: 'Bots', icon: <SmartToyIcon fontSize="small" />, path: '/bots' },
+    { text: 'Remarketing', icon: <CampaignIcon fontSize="small" />, path: '/remarketing' }, // ⬅️ novo item
   ];
 
   return (
@@ -177,7 +178,7 @@ export function Sidebar({ collapsed, isMobile = false, mobileOpen = false, onDra
       <AppBar
         position="fixed"
         elevation={0}
-        sx={{ 
+        sx={{
           bgcolor: 'rgba(18,18,18,0.95)',
           borderBottom: '1px solid rgba(255,255,255,0.05)',
           height: 60,
@@ -186,7 +187,7 @@ export function Sidebar({ collapsed, isMobile = false, mobileOpen = false, onDra
           boxShadow: 'none',
           backdropFilter: 'saturate(180%) blur(10px)',
           display: 'flex',
-          justifyContent: 'center', 
+          justifyContent: 'center',
         }}
       >
         <Toolbar
@@ -262,7 +263,14 @@ export function Sidebar({ collapsed, isMobile = false, mobileOpen = false, onDra
           </List>
 
           {/* Lado direito: notificações e tema */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2, md: 3 }, whiteSpace: 'nowrap' }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: { xs: 1, sm: 2, md: 3 },
+              whiteSpace: 'nowrap',
+            }}
+          >
             <NotificationBox
               onClick={() => {
                 setOpenNotif(true);

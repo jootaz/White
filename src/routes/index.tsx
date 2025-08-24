@@ -1,10 +1,12 @@
 import { Routes, Route } from 'react-router-dom';
 import { Dashboard } from '../pages/Dashboard';
 import { Gastos } from '../pages/Gastos';
-import { Bots } from '../pages/Bots';
+import { Bots } from '../pages/Bots'; 
+import { createNewRemarketingMessage } from '../Remarketing/type';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { Login } from '../pages/Login/task';
 import { Bloqueado } from '../pages/Bloqueado/Bloqueado';
+import RemarketingPage from '../Remarketing/RemarketingPage';
 
 
 export function AppRoutes() {
@@ -33,7 +35,15 @@ export function AppRoutes() {
             <Bots />
           </DashboardLayout>
         }
-      />
+      /> 
+      <Route
+        path="/Remarketing"
+        element={
+          <DashboardLayout>
+            <RemarketingPage />
+          </DashboardLayout>
+        }
+      /> 
       <Route
         path="/settings"
         element={
