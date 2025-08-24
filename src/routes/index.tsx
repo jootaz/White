@@ -1,17 +1,16 @@
-import { Routes, Route } from 'react-router-dom';
-import { Dashboard } from '../pages/Dashboard';
-import { Gastos } from '../pages/Gastos';
-import { Bots } from '../pages/Bots'; 
-import { createNewRemarketingMessage } from '../Remarketing/type';
-import { DashboardLayout } from '../layouts/DashboardLayout';
-import { Login } from '../pages/Login/task';
-import { Bloqueado } from '../pages/Bloqueado/Bloqueado';
-import RemarketingPage from '../Remarketing/RemarketingPage';
-
+import { Routes, Route } from "react-router-dom";
+import { Dashboard } from "../pages/Dashboard";
+import { Gastos } from "../pages/Gastos";
+import { Bots } from "../pages/Bots";
+import { DashboardLayout } from "../layouts/DashboardLayout";
+import { Login } from "../pages/Login/task";
+import { Bloqueado } from "../pages/Bloqueado/Bloqueado";
+import RemarketingPage from "../Remarketing/BotsPage";
 
 export function AppRoutes() {
   return (
     <Routes>
+      {/* Dashboard */}
       <Route
         path="/"
         element={
@@ -20,6 +19,8 @@ export function AppRoutes() {
           </DashboardLayout>
         }
       />
+
+      {/* Gastos */}
       <Route
         path="/gastos"
         element={
@@ -28,6 +29,8 @@ export function AppRoutes() {
           </DashboardLayout>
         }
       />
+
+      {/* Bots */}
       <Route
         path="/bots"
         element={
@@ -35,15 +38,19 @@ export function AppRoutes() {
             <Bots />
           </DashboardLayout>
         }
-      /> 
+      />
+
+      {/* Remarketing */}
       <Route
-        path="/Remarketing"
+        path="/remarketing"
         element={
           <DashboardLayout>
             <RemarketingPage />
           </DashboardLayout>
         }
-      /> 
+      />
+
+      {/* Configurações */}
       <Route
         path="/settings"
         element={
@@ -52,14 +59,15 @@ export function AppRoutes() {
           </DashboardLayout>
         }
       />
-      <Route path="/" element={<Login onLogin={() => console.log("Logado")} />} />
-        <Route path="/bloqueado" element={<Bloqueado />} />
 
- <Route
-       path="/login" element={<Login onLogin={function (): void {
-          throw new Error('Function not implemented.');
-        } } />} />
+      {/* Login */}
+      <Route
+        path="/login"
+        element={<Login onLogin={() => console.log("Logado")} />}
+      />
 
+      {/* Bloqueado */}
+      <Route path="/bloqueado" element={<Bloqueado />} />
     </Routes>
   );
 }

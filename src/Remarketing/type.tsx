@@ -1,5 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
-
 export interface RemarketingMessage {
   id: string;
   titulo: string;
@@ -7,12 +5,25 @@ export interface RemarketingMessage {
   mensagem: string;
   botoes: string[];
   status: "ativo" | "inativo";
+  valor?: number; // ex: preço ou valor opcional
 }
 
-// Helper to create new message with ID
-export const createNewRemarketingMessage = (
-  data: Omit<RemarketingMessage, 'id'>
-): RemarketingMessage => ({
-  ...data,
-  id: uuidv4(),
-});
+export interface Bot {
+  id: string;
+  nome: string;
+  online: boolean;
+  totalStarts: number;
+  totalPagos: number;
+  mensagens: RemarketingMessage[];
+}
+
+export interface BotMetrics {
+  totalStarts: number;
+  totalPagos: number;
+  taxaConversao: number;
+  historico: {
+    data: string;
+    starts: number;
+    pagos: number;
+  }[];
+}
