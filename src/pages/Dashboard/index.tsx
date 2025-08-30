@@ -934,14 +934,14 @@ export function Dashboard() {
                       size="small"
                       sx={{
                         bgcolor: 'rgba(0, 0, 0, 0.2)',
-                        color: '#4caf50',
+                        color: '#008cffff',
                         ml: { xs: 0, sm: 1 },
                         fontWeight: 600,
                         borderRadius: '6px',
                         height: '20px',
                         '.MuiChip-label': { p: '0 6px' }
                       }}
-                      icon={<span style={{ color: '#4caf50', fontSize: '0.9em' }}>↑</span>}
+                      icon={<span style={{ color: '#008cffff', fontSize: '0.9em' }}>↑</span>}
                     />
                   </Typography>
 
@@ -995,7 +995,7 @@ export function Dashboard() {
                         <Line
                           type="monotone"
                           dataKey="lucros"
-                          stroke="#09ff00ff"
+                          stroke="#008cffff"
                           strokeWidth={2}
                           dot={{ r: 3 }}
                           activeDot={{ r: 5 }}
@@ -1004,7 +1004,7 @@ export function Dashboard() {
                         <Line
                           type="monotone"
                           dataKey="gastos"
-                          stroke="#f00a0aff"
+                          stroke="#0904ffff"
                           strokeWidth={2}
                           dot={{ r: 3 }}
                           activeDot={{ r: 5 }}

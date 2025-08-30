@@ -19,24 +19,25 @@ export function Login({ onLogin }: { onLogin: () => void }) {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [tentativas, setTentativas] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(0.5);
   const [muted, setMuted] = useState(true);
+  const [videoLoaded, setVideoLoaded] = useState(false);
+  const [videoError, setVideoError] = useState(false);
 
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const navigate = useNavigate();
 
+  // Inicializa áudio MP3 separado
   useEffect(() => {
     audioRef.current = new Audio("/3milhoes.mp3");
     audioRef.current.loop = true;
-    audioRef.current.currentTime = 35;
+    audioRef.current.currentTime = 35; // inicia de 35s
     audioRef.current.volume = volume;
     audioRef.current.muted = muted;
 
-    audioRef.current
-      .play()
-      .then(() => setIsPlaying(true))
-      .catch(() => setIsPlaying(false));
+    // autoplay silencioso
+    audioRef.current.play().catch(() => {});
 
     return () => {
       if (audioRef.current) {
@@ -46,21 +47,20 @@ export function Login({ onLogin }: { onLogin: () => void }) {
     };
   }, []);
 
+  // Atualiza volume/mute do áudio
   useEffect(() => {
     if (!audioRef.current) return;
     audioRef.current.volume = volume;
     audioRef.current.muted = muted;
+    if (!muted) audioRef.current.play().catch(() => {});
   }, [volume, muted]);
 
   const toggleMute = () => {
     if (!audioRef.current) return;
     if (muted) {
       setMuted(false);
-      if (audioRef.current.currentTime < 30) {
-        audioRef.current.currentTime = 30;
-      }
+      if (audioRef.current.currentTime < 30) audioRef.current.currentTime = 35;
       audioRef.current.play().catch(() => {});
-      setIsPlaying(true);
     } else {
       setMuted(true);
     }
@@ -69,78 +69,78 @@ export function Login({ onLogin }: { onLogin: () => void }) {
   const handleVolumeChange = (_: Event, newValue: number | number[]) => {
     const vol = Array.isArray(newValue) ? newValue[0] : newValue;
     setVolume(vol);
-    if (vol === 0) {
-      setMuted(true);
-    } else if (muted) {
-      setMuted(false);
-    }
+    if (vol === 0) setMuted(true);
+    else if (muted) setMuted(false);
   };
 
   const handleLogin = () => {
-    if (audioRef.current && audioRef.current.paused) {
-      if (audioRef.current.currentTime < 30) {
-        audioRef.current.currentTime = 30;
-      }
-      audioRef.current.muted = false;
-      audioRef.current.volume = volume;
-      audioRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
-      setMuted(false);
-    }
-
     if (email === "admin@email.com" && senha === "123456") {
       onLogin();
     } else {
       const novaTentativa = tentativas + 1;
       setTentativas(novaTentativa);
-
-      if (novaTentativa >= 2) {
-        navigate("/bloqueado");
-      } else {
-        alert("Credenciais inválidas. Tentativa " + novaTentativa);
-      }
+      if (novaTentativa >= 2) navigate("/bloqueado");
+      else alert("Credenciais inválidas. Tentativa " + novaTentativa);
     }
   };
 
   return (
     <>
-      {/* Vídeo de fundo */}
+      {/* Vídeo mudo de fundo */}
       <Box
         sx={{
-          position: "absolute",
+          position: "fixed",
           top: 0,
           left: 0,
           width: "100%",
           height: "100%",
           overflow: "hidden",
           zIndex: -2,
+          // Fallback de background caso o vídeo não carregue
+          background: "linear-gradient(45deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
         }}
       >
         <video
+          ref={videoRef}
           autoPlay
           loop
           muted
           playsInline
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          onLoadedData={() => setVideoLoaded(true)}
+          onError={() => {
+            console.error("Erro ao carregar vídeo de fundo");
+            setVideoError(true);
+            setVideoLoaded(false);
+          }}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            opacity: videoLoaded ? 1 : 0,
+            transition: "opacity 1s ease",
+            display: videoLoaded ? "block" : "none",
+          }}
         >
-          <source src="/3milhoes" type="video/mp3" />
+          <source src="/3milhoesvideo.mp4" type="video/mp4" />
+          <source src="/3milhoesvideo.webm" type="video/webm" />
           Seu navegador não suporta vídeo.
         </video>
       </Box>
 
-      {/* Sobreposição escura para contraste */}
+      {/* Overlay escura */}
       <Box
         sx={{
-          position: "absolute",
+          position: "fixed",
           top: 0,
           left: 0,
           width: "100%",
           height: "100%",
-          background: "rgba(0,0,0,0.5)",
+          background: "rgba(0,0,0,0.6)",
           zIndex: -1,
         }}
       />
 
-      {/* Login Paper */}
+      {/* Container de login */}
       <Box
         sx={{
           height: "100vh",
@@ -151,24 +151,25 @@ export function Login({ onLogin }: { onLogin: () => void }) {
           flexDirection: "column",
           gap: 2,
           padding: 2,
-          overflow: "hidden",
           color: "#eee",
           userSelect: "none",
+          position: "relative",
+          zIndex: 1,
         }}
       >
         <Paper
           elevation={0}
           sx={{
-            backgroundColor: "#121212cc",
+            backgroundColor: "#0d0d0dcc",
             color: "white",
-            padding: 4,
+            padding: 5,
             width: 380,
             borderRadius: 3,
             display: "flex",
             flexDirection: "column",
             gap: 3,
-            backdropFilter: "blur(10px)",
-            boxShadow: "0 0 25px rgba(0,0,0,0.8)",
+            backdropFilter: "blur(12px)",
+            boxShadow: "0 0 30px rgba(0,0,0,0.9)",
           }}
         >
           <Typography
@@ -176,7 +177,7 @@ export function Login({ onLogin }: { onLogin: () => void }) {
             textAlign="center"
             sx={{
               fontWeight: 700,
-              textShadow: "0 0 10px #3b5998, 0 0 20px #3b5998",
+              textShadow: "0 0 12px #3b5998, 0 0 25px #3b5998",
             }}
           >
             Bem-Vindo(a)
@@ -238,7 +239,7 @@ export function Login({ onLogin }: { onLogin: () => void }) {
               textTransform: "none",
               fontSize: "1rem",
               fontWeight: "bold",
-              paddingY: 1.2,
+              paddingY: 1.5,
               transition: "background-color 0.3s ease",
               "&:hover": { backgroundColor: "#36579eff" },
             }}
