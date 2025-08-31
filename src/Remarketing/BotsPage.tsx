@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Box,
   Button,
@@ -10,11 +10,19 @@ import {
   Select,
   MenuItem,
   Divider,
+  CircularProgress,
+  InputAdornment,
+  IconButton,
+  List,
+  ListItem,
+  ListItemText,
 } from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
+import { useApi } from "../hooks/useApi"; // ajuste o caminho
 
 // ---- Tipos ----
 interface BotMetric {
-  id: number;
+  id: string;
   name: string;
   online: boolean;
   starts: number;
@@ -26,17 +34,19 @@ interface RemarketingMessage {
   content: string | File | null;
   value?: number;
   buttonLabel?: string;
+  trigger?: "start" | "product" | "payment"; // Novo campo
+  schedule?: string; // Novo campo (ex: "2025-09-01 18:00")
 }
 
 // ---- Componente Principal ----
 export default function RemarketingPage() {
+  const { listBots } = useApi();
+
   // Estado dos bots
-  const [bots] = useState<BotMetric[]>([
-    { id: 1, name: "Bot Alpha", online: true, starts: 320, paidUsers: 58 },
-    { id: 2, name: "Bot Beta", online: false, starts: 210, paidUsers: 33 },
-    { id: 3, name: "Bot Gamma", online: true, starts: 520, paidUsers: 120 },
-  ]);
+  const [bots, setBots] = useState<BotMetric[]>([]);
   const [selectedBot, setSelectedBot] = useState<BotMetric | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   // Estado da mensagem
   const [message, setMessage] = useState<RemarketingMessage>({
@@ -44,7 +54,35 @@ export default function RemarketingPage() {
     content: "",
     value: undefined,
     buttonLabel: "",
+    trigger: "start",
+    schedule: "",
   });
+
+  // Fetch dos bots
+  useEffect(() => {
+    const fetchBots = async () => {
+      try {
+        setLoading(true);
+        const res = await listBots();
+        if (res?.data) {
+          const mapped = res.data.map((apiBot: any) => ({
+            id: apiBot._id,
+            name: apiBot.name,
+            online: apiBot.running ?? false,
+            starts: apiBot.starts ?? 0,
+            paidUsers: apiBot.paidUsers ?? 0,
+          }));
+          setBots(mapped);
+        }
+      } catch (err) {
+        console.error("Erro ao buscar bots:", err);
+        setBots([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchBots();
+  }, [listBots]);
 
   // Upload de arquivo
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,6 +90,11 @@ export default function RemarketingPage() {
       setMessage({ ...message, content: e.target.files[0] });
     }
   };
+
+  // Filtra bots pelo nome
+  const filteredBots = bots.filter((b) =>
+    b.name.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <Box sx={{ background: "#0b0b0b", minHeight: "100vh", p: 5, pt: 8 }}>
@@ -72,104 +115,141 @@ export default function RemarketingPage() {
       <Grid container spacing={4}>
         {/* Coluna Esquerda */}
         <Grid item xs={12} md={4}>
-          {/* Métricas resumidas */}
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            {[
-              {
-                title: "Bots Online",
-                value: bots.filter((b) => b.online).length,
-                color: "#3fbf4c",
-              },
-              {
-                title: "Total Starts",
-                value: bots.reduce((acc, b) => acc + b.starts, 0),
-                color: "#1361c7ff",
-              },
-              {
-                title: "Usuários Pagos",
-                value: bots.reduce((acc, b) => acc + b.paidUsers, 0),
-                color: "#1361c7ff",
-              },
-            ].map((metric, idx) => (
-              <Grid item xs={12} key={idx}>
-                <Card
-                  sx={{
-                    background: "#1a1a1a",
-                    borderRadius: 2,
-                    boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-                  }}
-                >
-                  <CardContent>
-                    <Typography variant="subtitle1" sx={{ color: "#aaa" }}>
-                      {metric.title}
-                    </Typography>
-                    <Typography
-                      variant="h4"
-                      sx={{ color: metric.color, fontWeight: 700 }}
+          {loading ? (
+            <CircularProgress sx={{ color: "#1361c7ff" }} />
+          ) : (
+            <>
+              {/* Métricas resumidas */}
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                {[
+                  {
+                    title: "Bots Online",
+                    value: bots.filter((b) => b.online).length,
+                    color: "#3fbf4c",
+                  },
+                  {
+                    title: "Total Starts",
+                    value: bots.reduce((acc, b) => acc + b.starts, 0),
+                    color: "#1361c7ff",
+                  },
+                  {
+                    title: "Usuários Pagos",
+                    value: bots.reduce((acc, b) => acc + b.paidUsers, 0),
+                    color: "#1361c7ff",
+                  },
+                ].map((metric, idx) => (
+                  <Grid item xs={12} key={idx}>
+                    <Card
+                      sx={{
+                        background: "#1a1a1a",
+                        borderRadius: 2,
+                        boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+                      }}
                     >
-                      {metric.value}
-                    </Typography>
-                  </CardContent>
-                </Card>
+                      <CardContent>
+                        <Typography variant="subtitle1" sx={{ color: "#aaa" }}>
+                          {metric.title}
+                        </Typography>
+                        <Typography
+                          variant="h4"
+                          sx={{ color: metric.color, fontWeight: 700 }}
+                        >
+                          {metric.value}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
               </Grid>
-            ))}
-          </Grid>
 
-          {/* Lista de Bots */}
-          <Card
-            sx={{
-              background: "#1a1a1a",
-              borderRadius: 2,
-              boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-            }}
-          >
-            <CardContent>
-              <Typography
-                variant="h6"
-                sx={{ color: "#f0f0f0", mb: 2, fontWeight: 600 }}
+              {/* Filtro + Lista de Bots */}
+              <Card
+                sx={{
+                  background: "#1a1a1a",
+                  borderRadius: 2,
+                  boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+                }}
               >
-                Bots Cadastrados
-              </Typography>
-              {bots.map((bot) => (
-                <Box
-                  key={bot.id}
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    p: 2,
-                    mb: 1,
-                    borderRadius: 1.5,
-                    background:
-                      selectedBot?.id === bot.id ? "#2a2a2a" : "#141414",
-                    cursor: "pointer",
-                    transition: "0.2s",
-                    "&:hover": { background: "#222" },
-                  }}
-                  onClick={() => setSelectedBot(bot)}
-                >
-                  <Box>
-                    <Typography
-                      sx={{ color: "#f0f0f0", fontWeight: 500 }}
-                    >
-                      {bot.name}
-                    </Typography>
-                    <Typography sx={{ color: "#888", fontSize: 14 }}>
-                      {bot.starts} starts • {bot.paidUsers} pagos
-                    </Typography>
-                  </Box>
+                <CardContent>
                   <Typography
+                    variant="h6"
+                    sx={{ color: "#f0f0f0", mb: 2, fontWeight: 600 }}
+                  >
+                    Bots Cadastrados
+                  </Typography>
+
+                  {/* Campo de busca */}
+                  <TextField
+                    placeholder="Buscar bot..."
+                    fullWidth
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <IconButton>
+                            <SearchIcon sx={{ color: "#888" }} />
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
                     sx={{
-                      color: bot.online ? "#3fbf4c" : "#ff5a5a",
-                      fontWeight: 600,
+                      mb: 2,
+                      input: { color: "#f0f0f0" },
+                      "& .MuiOutlinedInput-root": {
+                        "& fieldset": { borderColor: "#333" },
+                      },
+                    }}
+                  />
+
+                  <List
+                    sx={{
+                      maxHeight: 400,
+                      overflowY: "auto",
+                      bgcolor: "#141414",
+                      borderRadius: 2,
                     }}
                   >
-                    {bot.online ? "Online" : "Offline"}
-                  </Typography>
-                </Box>
-              ))}
-            </CardContent>
-          </Card>
+                    {filteredBots.map((bot) => (
+                      <ListItem
+                        key={bot.id}
+                        button
+                        selected={selectedBot?.id === bot.id}
+                        onClick={() => setSelectedBot(bot)}
+                        sx={{
+                          "&.Mui-selected": {
+                            backgroundColor: "#2a2a2a",
+                          },
+                          "&:hover": { backgroundColor: "#222" },
+                        }}
+                      >
+                        <ListItemText
+                          primary={
+                            <Typography sx={{ color: "#f0f0f0" }}>
+                              {bot.name}
+                            </Typography>
+                          }
+                          secondary={
+                            <Typography sx={{ color: "#888", fontSize: 13 }}>
+                              {bot.starts} starts • {bot.paidUsers} pagos
+                            </Typography>
+                          }
+                        />
+                        <Typography
+                          sx={{
+                            color: bot.online ? "#3fbf4c" : "#ff5a5a",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {bot.online ? "Online" : "Offline"}
+                        </Typography>
+                      </ListItem>
+                    ))}
+                  </List>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </Grid>
 
         {/* Coluna Direita */}
@@ -220,6 +300,20 @@ export default function RemarketingPage() {
               >
                 Nova Mensagem de Remarketing
               </Typography>
+
+              {/* Disparo */}
+              <Select
+                fullWidth
+                value={message.trigger}
+                onChange={(e) =>
+                  setMessage({ ...message, trigger: e.target.value as any })
+                }
+                sx={{ mb: 2, color: "#f0f0f0" }}
+              >
+                <MenuItem value="start">Ao iniciar</MenuItem>
+                <MenuItem value="product">Produto</MenuItem>
+                <MenuItem value="payment">Pagamento</MenuItem>
+              </Select>
 
               {/* Tipo da mensagem */}
               <Select
@@ -298,6 +392,21 @@ export default function RemarketingPage() {
                 value={message.buttonLabel}
                 onChange={(e) =>
                   setMessage({ ...message, buttonLabel: e.target.value })
+                }
+                sx={{
+                  mb: 2,
+                  input: { color: "#f0f0f0" },
+                  label: { color: "#888" },
+                }}
+              />
+
+              {/* Agendamento */}
+              <TextField
+                fullWidth
+                label="Agendar (YYYY-MM-DD HH:mm)"
+                value={message.schedule}
+                onChange={(e) =>
+                  setMessage({ ...message, schedule: e.target.value })
                 }
                 sx={{
                   mb: 2,

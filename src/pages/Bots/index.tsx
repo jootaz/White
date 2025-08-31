@@ -338,7 +338,30 @@ export function Bots() {
       setError('Falha ao deletar o bot. Por favor, tente novamente.');
       setTimeout(() => setError(null), 5000);
     }
-  };
+  }; 
+
+ // Estado para estatísticas
+const [stats, setStats] = useState({
+  totalUsers: 0,
+  startUsers: 0,
+  paidUsers: 0,
+  unpaidUsers: 0,
+});
+
+// Atualiza stats quando bots mudar
+useEffect(() => {
+  const totalUsers = bots.reduce((sum, bot) => sum + (bot.usuarios?.ativos || 0), 0);
+  const startUsers = bots.reduce((sum, bot) => sum + (bot.usuarios?.hoje || 0), 0);
+  const paidUsers = bots.reduce((sum, bot) => {
+    const vendasHoje = bot.vendas?.hoje || "0";
+    // Remove "R$" e "k" e transforma em número
+    const num = parseFloat(vendasHoje.replace(/[^\d,]/g, "").replace(",", ".")) || 0;
+    return sum + num;
+  }, 0);
+  const unpaidUsers = bots.reduce((sum, bot) => sum + (bot.usuarios?.bloqueados || 0), 0);
+
+  setStats({ totalUsers, startUsers, paidUsers, unpaidUsers });
+}, [bots]);
 
   return (
     <Box sx={{ p: 2 }}>
@@ -380,10 +403,10 @@ export function Bots() {
       {/* Estatísticas de usuários */}
 <Grid container spacing={2} sx={{ mb: 3 }}>
   {[
-    { label: "Usuários Totais", value: 1234, icon: GroupsIcon },
-    { label: "Usuários /start", value: 850, icon: PlayCircleOutlineIcon },
-    { label: "Usuários Pagantes", value: 320, icon: PaidIcon },
-    { label: "Gerou e não Pagou", value: 530, icon: ReportProblemIcon },
+    { label: "Usuários Totais", value: stats.totalUsers, icon: GroupsIcon },
+    { label: "Usuários /start", value: stats.startUsers, icon: PlayCircleOutlineIcon },
+    { label: "Usuários Pagantes", value: stats.paidUsers, icon: PaidIcon },
+    { label: "Gerou e não Pagou", value: stats.unpaidUsers, icon: ReportProblemIcon },
   ].map((stat, index) => (
     <Grid item xs={12} sm={6} md={3} key={index}>
       <Paper
